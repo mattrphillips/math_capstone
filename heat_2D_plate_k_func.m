@@ -1,10 +1,10 @@
-clear all
+%clear all
 
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Matt Phillips
 % Dr. Brent Deschamp
-% 10/24/2019
+% 10/29/2019
 % Math Capstone
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 2D plate. Using Crank-Nicolson method with variable k a heat source, and 
@@ -13,16 +13,16 @@ clear all
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Parameters
-x0 = -4;         % First x-coord of plate [m]
-xf = 4;        % Last x-coord of the plate [m]
+x0 = -3;         % First x-coord of plate [m]
+xf = 3;        % Last x-coord of the plate [m]
 y0 = -3;         % First y-coord of the plate [m]
 yf = 3;         % Last y-coord of the plate [m]
 
 t0 = 0;         % Initial time [s]
-tf = 10;       % Final time [s]
+tf = 120;       % Final time [s]
 
 k1 = 0.02435;        % thermal conductivity [W/(mK)] (air)
-k2 = 7;             % thermal conductivity [W/(mK)] (wall?)
+R = 346;             % R-value of insulating material [(m^2)K/W] (vacuum)
 
 % Type of BC's
     % 0 == Dirichlet BC
@@ -41,14 +41,12 @@ IC = @(x,y,t) 200;
 SOURCE = @(x,y,t) 0*cos(1.5*pi*x/(xf-x0))*cos(pi*y/(yf-y0))*cos(pi*t);
 
 % Domain step sizes
-delta_x = .25;                        % [m]
+delta_x = .2;                        % [m]
 x_steps = (xf-x0)/delta_x + 1;      % []
-delta_y = .25;                        % [m]
+delta_y = .2;                        % [m]
 y_steps = (yf-y0)/delta_y + 1;      % []
 delta_t = .05;                       % [s]
 t_steps = (tf-t0)/delta_t + 1;       % []
-
-k = @(x,y) ;
 
 % Video parameters
 vid_bool = 'ON';
@@ -66,6 +64,9 @@ end
 x = linspace(x0,xf,x_steps);
 y = linspace(y0,yf,y_steps);
 t = linspace(t0,tf,t_steps);
+
+% Construct geometry
+k = k_geo(x,y,x_steps,y_steps,k1,R)
 
 % Initialize temperature profile, u(x,t) and position vector X(x,y)
 u = zeros(length(x)*length(y),length(t));
@@ -182,19 +183,19 @@ for n = 2:t_steps
                 if LHS_bool == 1
                     % Coef. for u_11
                     index_i = (j-1)*x_steps + i;
-                    A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-                    B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
                     % Coef. for u_12
                     index_i = ((j+1)-1)*x_steps + i;
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_y)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_y)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_y)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_y)^2;
                     % Coef. for u_21
                     index_i = (j-1)*x_steps + (i+1);
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_x)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_x)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_x)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_x)^2;
 
-                    Gamma(index_j,1) = ((k(x(i),y(j)).*delta_t^2)/delta_y)*(BS(x(i),t(n))+BS(x(i),t(n-1))) - ...
-                        ((k(x(i),y(j)).*delta_t^2)/delta_x)*(LHS(y(j),t(n))+LHS(y(j),t(n-1)));                
+                    Gamma(index_j,1) = ((k(j,i).*delta_t^2)/delta_y)*(BS(x(i),t(n))+BS(x(i),t(n-1))) - ...
+                        ((k(j,i).*delta_t^2)/delta_x)*(LHS(y(j),t(n))+LHS(y(j),t(n-1)));                
                 elseif LHS_bool == 0
                     index_i = (j-1)*x_steps + i;
                     A(index_j,index_i) = LHS(y(j),t(n-1))/LHS(y(j),t(n));
@@ -205,41 +206,41 @@ for n = 2:t_steps
             elseif i ~= 1 && i ~= x_steps
                 % Coef. for u_i1
                 index_i = (j-1)*x_steps + i;
-                A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-                B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
                 % Coef. for u_i2
                 index_i = ((j+1)-1)*x_steps + i;
-                A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_y)^2;
-                B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_y)^2;
+                A(index_j,index_i) = -k(j,i).*(delta_t/delta_y)^2;
+                B(index_j,index_i) = k(j,i).*(delta_t/delta_y)^2;
                 % Coef. for u_(i-1)1
                 index_i = (j-1)*x_steps + (i-1);
-                A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_x)^2;
-                B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_x)^2;
+                A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_x)^2;
+                B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_x)^2;
                 % Coef. for u_(i+1)1
                 index_i = (j-1)*x_steps + (i+1);
-                A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_x)^2;
-                B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_x)^2;
+                A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_x)^2;
+                B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_x)^2;
 
-                Gamma(index_j,1) = ((k(x(i),y(j)).*delta_t^2)/delta_y)*(BS(x(i),t(n))+BS(x(i),t(n-1)));            
+                Gamma(index_j,1) = ((k(j,i).*delta_t^2)/delta_y)*(BS(x(i),t(n))+BS(x(i),t(n-1)));            
 
             % Check Bottom-Right corner
             elseif i == x_steps
                 if RHS_bool == 1
                     % Coef. for u_xf1
                     index_i = (j-1)*x_steps + i;
-                    A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-                    B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
                     % Coef. for u_xf2
                     index_i = ((j+1)-1)*x_steps + i;
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_y)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_y)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_y)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_y)^2;
                     % Coef. for u_(xf-1)1
                     index_i = (j-1)*x_steps + (i-1);
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_x)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_x)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_x)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_x)^2;
 
-                    Gamma(index_j,1) = ((k(x(i),y(j)).*delta_t^2)/delta_y)*(BS(x(i),t(n))+BS(x(i),t(n-1))) + ...
-                        ((k(x(i),y(j)).*delta_t^2)/delta_x)*(RHS(y(j),t(n))+RHS(y(j),t(n-1)));            
+                    Gamma(index_j,1) = ((k(j,i).*delta_t^2)/delta_y)*(BS(x(i),t(n))+BS(x(i),t(n-1))) + ...
+                        ((k(j,i).*delta_t^2)/delta_x)*(RHS(y(j),t(n))+RHS(y(j),t(n-1)));            
                 elseif RHS_bool == 0
                     A(index_j,index_i) = RHS(y(j),t(n-1))./RHS(y(j),t(n));
                     B(index_j,index_i) = 1;
@@ -264,22 +265,22 @@ for n = 2:t_steps
         elseif LHS_bool == 1;
             % Coef. for u_1j
             index_i = (j-1)*x_steps + i;
-            A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-            B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+            A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+            B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
             % Coef. for u_2j
             index_i = (j-1)*x_steps + (i+1);
-            A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_x)^2;
-            B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_x)^2;
+            A(index_j,index_i) = -k(j,i).*(delta_t/delta_x)^2;
+            B(index_j,index_i) = k(j,i).*(delta_t/delta_x)^2;
             % Coef. for u_1(j-1)
             index_i = ((j-1)-1)*x_steps + i;
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_y)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_y)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_y)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_y)^2;
             % Coef. for u_1(j+1)
             index_i = ((j+1)-1)*x_steps + i;
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_y)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_y)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_y)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_y)^2;
             
-            Gamma(index_j,1) = -((k(x(i),y(j)).*delta_t^2)/delta_x)*(LHS(y(j),t(n))+LHS(y(j),t(n-1)));
+            Gamma(index_j,1) = -((k(j,i).*delta_t^2)/delta_x)*(LHS(y(j),t(n))+LHS(y(j),t(n-1)));
         end
 
         % Update coef. to modify interior temperatures
@@ -289,29 +290,29 @@ for n = 2:t_steps
             
             % Calculate column for u_ij
             index_i = (j-1)*x_steps + i;
-            A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-            B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+            A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+            B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
             Gamma(index_j,1) = delta_t*SOURCE(x(i),y(j),t(n-1));
             
             % Calculate column for u_i(j-1)
             index_i = (j-2)*x_steps + i;
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_y)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_y)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_y)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_y)^2;
             
             % Calculate column for u_i(j+1)
             index_i = (j)*x_steps + i;
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_y)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_y)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_y)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_y)^2;
             
             % Calculate column for u_(i-1)j
             index_i = (j-1)*x_steps + (i-1);
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_x)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_x)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_x)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_x)^2;
             
             % Calculate column for u_(i+1)j
             index_i = (j-1)*x_steps + (i+1);
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_x)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_x)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_x)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_x)^2;
             
         end
 
@@ -329,22 +330,22 @@ for n = 2:t_steps
         elseif RHS_bool == 1
             % Coef. for u_xfj
             index_i = (j-1)*x_steps + i;
-            A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-            B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+            A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+            B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
             % Coef. for u_(xf-1)j
             index_i = (j-1)*x_steps + (i-1);
-            A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_x)^2;
-            B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_x)^2;
+            A(index_j,index_i) = -k(j,i).*(delta_t/delta_x)^2;
+            B(index_j,index_i) = k(j,i).*(delta_t/delta_x)^2;
             % Coef. for u_xf(j-1)
             index_i = ((j-1)-1)*x_steps + i;
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_y)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_y)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_y)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_y)^2;
             % Coef. for u_1(j+1)
             index_i = ((j+1)-1)*x_steps + i;
-            A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_y)^2;
-            B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_y)^2;
+            A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_y)^2;
+            B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_y)^2;
             
-            Gamma(index_j,1) = ((k(x(i),y(j)).*delta_t^2)/delta_x)*(RHS(y(j),t(n))+RHS(y(j),t(n-1)));
+            Gamma(index_j,1) = ((k(j,i).*delta_t^2)/delta_x)*(RHS(y(j),t(n))+RHS(y(j),t(n-1)));
         end
     end
     
@@ -366,19 +367,19 @@ for n = 2:t_steps
                 if LHS_bool == 1
                     % Coef. for u_1yf
                     index_i = (j-1)*x_steps + i;
-                    A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-                    B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
                     % Coef. for u_1(yf-1)
                     index_i = ((j-1)-1)*x_steps + i;
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_y)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_y)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_y)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_y)^2;
                     % Coef. for u_2yf
                     index_i = (j-1)*x_steps + (i+1);
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_x)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_x)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_x)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_x)^2;
 
-                    Gamma(index_j,1) = -((k(x(i),y(j)).*delta_t^2)/delta_y)*(TS(x(i),t(n))+TS(x(i),t(n-1))) - ...
-                        ((k(x(i),y(j)).*delta_t^2)/delta_x)*(LHS(y(j),t(n))+LHS(y(j),t(n-1)));                        
+                    Gamma(index_j,1) = -((k(j,i).*delta_t^2)/delta_y)*(TS(x(i),t(n))+TS(x(i),t(n-1))) - ...
+                        ((k(j,i).*delta_t^2)/delta_x)*(LHS(y(j),t(n))+LHS(y(j),t(n-1)));                        
                 elseif LHS_bool == 0
                     index_i = (j-1)*x_steps + i;
                     A(index_j,index_i) = LHS(y(j),t(n-1))/LHS(y(j),t(n));
@@ -390,41 +391,41 @@ for n = 2:t_steps
             elseif i ~= 1 && i ~= x_steps
                 % Coef. for u_iyf
                 index_i = (j-1)*x_steps + i;
-                A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-                B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
                 % Coef. for u_i(yf-1)
                 index_i = ((j-1)-1)*x_steps + i;
-                A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_y)^2;
-                B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_y)^2;
+                A(index_j,index_i) = -k(j,i).*(delta_t/delta_y)^2;
+                B(index_j,index_i) = k(j,i).*(delta_t/delta_y)^2;
                 % Coef. for u_(i-1)yf
                 index_i = (j-1)*x_steps + (i-1);
-                A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_x)^2;
-                B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_x)^2;
+                A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_x)^2;
+                B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_x)^2;
                 % Coef. for u_(i+1)yf
                 index_i = (j-1)*x_steps + (i+1);
-                A(index_j,index_i) = -(k(x(i),y(j))./2)*(delta_t/delta_x)^2;
-                B(index_j,index_i) = (k(x(i),y(j))./2)*(delta_t/delta_x)^2;
+                A(index_j,index_i) = -(k(j,i)./2)*(delta_t/delta_x)^2;
+                B(index_j,index_i) = (k(j,i)./2)*(delta_t/delta_x)^2;
 
-                Gamma(index_j,1) = -((k(x(i),y(j)).*delta_t^2)/delta_y)*(TS(x(i),t(n))+TS(x(i),t(n-1)));                        
+                Gamma(index_j,1) = -((k(j,i).*delta_t^2)/delta_y)*(TS(x(i),t(n))+TS(x(i),t(n-1)));                        
             
             % Check Top-Right corner
             elseif i == x_steps
                 if RHS_bool == 1
                     % Coef. for u_xfyf
                     index_i = (j-1)*x_steps + i;
-                    A(index_j,index_i) = 1 + k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
-                    B(index_j,index_i) = 1 - k(x(i),y(j)).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    A(index_j,index_i) = 1 + k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
+                    B(index_j,index_i) = 1 - k(j,i).*((delta_t/delta_x)^2 + (delta_t/delta_y)^2);
                     % Coef. for u_xf(yf-1)
                     index_i = ((j-1)-1)*x_steps + i;
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_y)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_y)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_y)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_y)^2;
                     % Coef. for u_(xf-1)yf
                     index_i = (j-1)*x_steps + (i-1);
-                    A(index_j,index_i) = -k(x(i),y(j)).*(delta_t/delta_x)^2;
-                    B(index_j,index_i) = k(x(i),y(j)).*(delta_t/delta_x)^2;
+                    A(index_j,index_i) = -k(j,i).*(delta_t/delta_x)^2;
+                    B(index_j,index_i) = k(j,i).*(delta_t/delta_x)^2;
 
-                    Gamma(index_j,1) = -((k(x(i),y(j)).*delta_t^2)/delta_y)*(TS(x(i),t(n))+TS(x(i),t(n-1))) + ...
-                        ((k(x(i),y(j)).*delta_t^2)/delta_x)*(RHS(y(j),t(n))+RHS(y(j),t(n-1)));                        
+                    Gamma(index_j,1) = -((k(j,i).*delta_t^2)/delta_y)*(TS(x(i),t(n))+TS(x(i),t(n-1))) + ...
+                        ((k(j,i).*delta_t^2)/delta_x)*(RHS(y(j),t(n))+RHS(y(j),t(n-1)));                        
                 elseif RHS_bool == 0
                     index_i = (j-1)*x_steps + i;
                     A(index_j,index_i) = RHS(y(j),t(n-1))./RHS(y(j),t(n));
